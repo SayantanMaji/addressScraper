@@ -8,30 +8,41 @@ from bs4 import BeautifulSoup
 import re
 import pandas as pd
 
+driver = None
+i = None
 AddDict = {}
 
-def scrape_address_data(postal_code):
-    global AddDict
 
-    print(postal_code)
-
-    driver = webdriver.Chrome()
+def init_browser():
+    global driver
+    driver = webdriver.Chrome()  # You can replace "Chrome" with the browser of your choice.
     driver.get("https://prizereactor.co.uk/index.php/register/50poundfriday")
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "/html/body/div[3]/div[3]/div/button"))).click()
+        driver.maximize_window()
+
+    except:
+        pass
+
+
+def scrape_address_data(postal_code):
+    global driver, AddDict, address_options, country, i
+
+    city = None
+
+    i = i + 1
 
     try:
-        try:
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "/html/body/div[3]/div[3]/div/button"))).click()
-        except:
-            pass
-
-        post_code_input = driver.find_element(By.NAME, "postcode")
+        post_code_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "postcode")))
+        post_code_input.clear()
         post_code_input.send_keys(postal_code)
 
-        find_address_button = driver.find_element(By.XPATH, "//*[@id=\"register_find_address_button\"]")
+        find_address_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//*[@id=\"register_find_address_button\"]")))
         find_address_button.click()
 
-        time.sleep(2)
+        time.sleep(1)
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
 
@@ -44,7 +55,6 @@ def scrape_address_data(postal_code):
 
         address_options = [option.text for option in soup.select("#register_address_line_1 option")]
         address_options.remove("Please select")
-
 
         # Extract details from the UK postcode
         area, district, sector, unit = extract_details_from_uk_postcode(postal_code)
@@ -65,6 +75,7 @@ def scrape_address_data(postal_code):
                     'Address Options': address_options
                 }
 
+            print(i, "| ", postal_code, " | City:", city, "| Suburb:", country)
 
         else:
             print("Invalid UK postcode format.")
@@ -73,8 +84,6 @@ def scrape_address_data(postal_code):
         print("An error occurred:", e)
 
     finally:
-        driver.quit()
-
         # Save the global dictionary to a file after each run
         with open("global_dict.pkl", "wb") as file:
             pickle.dump(AddDict, file)
@@ -88,6 +97,11 @@ def scrape_address_data(postal_code):
         }
     ]
 
+
+def cleanup_browser():
+    global driver
+    if driver:
+        driver.quit()
 
 
 def extract_details_from_uk_postcode(postcode):
@@ -105,38 +119,32 @@ def extract_details_from_uk_postcode(postcode):
 
 
 if __name__ == "__main__":
+    i = 0
     file_path = r'C:\Users\91967\Downloads\sample_data.xlsx'
     df = pd.read_excel(file_path)
 
-    # Convert the postal codes to strings to preserve any leading zeros
     df['postcode'] = df['postcode'].astype(str)
 
-    # Extract data from the 'postcode' column
     postal_codes = df['postcode'].tolist()
 
-    # Add a space before the last three characters of each postal code if it doesn't exist
     postal_codes_with_space = [code[:-3] + (' ' if len(code) > 3 and not code[-4].isspace() else '') + code[-3:] for
                                code in postal_codes]
 
-    # Create an empty list to store the results
     results = []
 
-    # Call the function with each postal code and store the results in the list
-    for postal_code in postal_codes_with_space:
-        result = scrape_address_data(postal_code)
-        results.extend(result)  # Extend the list instead of appending
+    try:
+        init_browser()
+        for postal_code in postal_codes_with_space:
+            result = scrape_address_data(postal_code)
+            results.extend(result)
 
-    # Create a DataFrame from the results list
-    df_output = pd.DataFrame(results, columns=['Postal Code', 'Suburb', 'City', 'Address Options'])
+        df_output = pd.DataFrame(results, columns=['Postal Code', 'Suburb', 'City', 'Address Options'])
 
-    # Save the DataFrame to a new Excel file
-    output_file_path = r'C:\Users\91967\Downloads\output_data.xlsx'
-    df_output.to_excel(output_file_path, index=False)
+        output_file_path = r'C:\Users\91967\Downloads\output_data.xlsx'
+        df_output.to_excel(output_file_path, index=False)
 
-    print("Output data has been saved to 'output_data.xlsx'.")
+    finally:
+        cleanup_browser()
 
     print("AddDict:", AddDict)
     print("Output data has been saved to 'output_data.xlsx'.")
-
-
-
