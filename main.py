@@ -52,7 +52,6 @@ def scrape_address_data(postal_code):
         country_element = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "register_address_county")))
         country = country_element.get_attribute("value") if country_element else None
-
         address_options = [option.text for option in soup.select("#register_address_line_1 option")]
         address_options.remove("Please select")
 
@@ -78,9 +77,11 @@ def scrape_address_data(postal_code):
             print(i, "| ", postal_code, " | City:", city, "| Suburb:", country)
 
         else:
+            address_options = ["Invalid code"]
             print("Invalid UK postcode format.")
 
     except Exception as e:
+        address_options = ["Invalid code"]
         print("An error occurred:", e)
 
     finally:
@@ -120,7 +121,7 @@ def extract_details_from_uk_postcode(postcode):
 
 if __name__ == "__main__":
     i = 0
-    file_path = r'C:\Users\91967\Downloads\sample_data.xlsx'
+    file_path = r'C:\Users\91967\Documents\allpossiblexls\fullcodes5.xlsx'
     df = pd.read_excel(file_path)
 
     df['postcode'] = df['postcode'].astype(str)
@@ -140,11 +141,11 @@ if __name__ == "__main__":
 
         df_output = pd.DataFrame(results, columns=['Postal Code', 'Suburb', 'City', 'Address Options'])
 
-        output_file_path = r'C:\Users\91967\Downloads\output_data.xlsx'
+        output_file_path = r'C:\Users\91967\Documents\allpossiblexls_output\output_5_data.xlsx'
         df_output.to_excel(output_file_path, index=False)
 
     finally:
         cleanup_browser()
 
     print("AddDict:", AddDict)
-    print("Output data has been saved to 'output_data.xlsx'.")
+    print("Output data has been saved to 'output_5_data.xlsx'.")
